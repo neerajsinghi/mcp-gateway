@@ -1,0 +1,57 @@
+# Example mcp-gateway configuration.
+# Secrets are never written here: API keys come from environment variables
+# (key_env) or are stored as SHA-256 digests (key_sha256).
+
+listen: ":8080"
+max_body_bytes: 1048576
+
+upstreams:
+  - name: github
+    url: http://localhost:9000/mcp       # the MCP server's Streamable HTTP endpoint
+    path: /mcp/github                    # what clients connect to on the gateway
+    timeout: 30s                         # time to first response byte
+    headers:
+      # Credentials for the upstream, injected by the gateway. Client
+      # credentials (Authorization, X-API-Key, Cookie) are always stripped.
+      Authorization: "Bearer ${GITHUB_MCP_TOKEN}"
+  - name: files
+    url: http://localhost:9001/mcp
+
+auth:
+  api_keys:
+    - identity: ci-bot
+      key_env: CI_BOT_API_KEY
+    - identity: analyst
+      # sha256("analyst-demo-key"); generate with: mcp-gateway -hash-key VAR
+      key_sha256: 5c4e8ccd9b8ad7e491cf19fcd42b0c5a2384b05739578de4856a4828b94b843f
+  jwt:
+    issuer: https://auth.example.com/
+    audience: mcp-gateway
+    hs256_secret_env: MCP_GATEWAY_JWT_SECRET   # >= 32 bytes
+    # rs256_public_key_file: /etc/mcp-gateway/jwt.pub.pem
+    identity_claim: sub
+    leeway: 30s
+
+policies:
+  admin:
+    allow_tools: ["*"]
+  readonly:
+    allow_tools: ["search_*", "get_*", "list_*", "read_*"]
+    deny_tools: ["*secret*"]
+    rate_limit: {rps: 5, burst: 20}          # every request from the identity
+    tool_rate_limits:
+      search_*: {rps: 0.5, burst: 5}         # per identity, per tool
+
+bindings:
+  ci-bot: admin
+  analyst: readonly
+
+# Identities without a binding get this policy. Leave empty to deny all tools.
+default_policy: readonly
+
+tracing:
+  enabled: false
+  endpoint: localhost:4318
+  insecure: true
+  service_name: mcp-gateway
+  sample_ratio: 1.0

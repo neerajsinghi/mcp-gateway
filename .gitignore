@@ -1,0 +1,18 @@
+# Binaries
+/mcp-gateway
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Local config and secrets
+*.local.yaml
+.env
+*.pem
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
